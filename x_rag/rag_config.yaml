@@ -1,0 +1,61 @@
+# Base directory relative to this config file's location
+base_dir: ../../
+
+model_config:
+  # The embedding model is now hardcoded to CLIP in MultimodalEmbedder
+  embedding_model:
+    name: openai/clip-vit-base-patch32
+    provider: huggingface_transformers
+    
+  llm_model:
+    name: gemini-2.5-flash-lite # Corrected to the 2.5 version you are using
+    temperature: 0.2
+    max_length: 2048
+    top_p: 0.95
+    
+  prompt_template:
+    template: |
+      You are a professional medical imaging AI assistant with extensive experience in radiological diagnosis.
+      
+      Please answer the question based on the following reference information. Your requirements are:
+      1. Your answer must be accurate, professional, and evidence-based.
+      2. If the reference information is insufficient to answer the question, state that clearly.
+      3. For any diagnostic suggestions, always remind the user to consult a professional physician.
+      4. If there are relevant medical images available for the retrieved cases, mention this to the user and ask if they would like to view the images.
+      
+      Reference Information:
+      {context}
+      
+      Question:
+      {input}
+      
+      Provide your professional medical answer:
+    input_variables: ["context", "input"]
+
+text_processing_config:
+  # 文本分块配置
+  chunk_size: 300  
+  chunk_overlap: 100  
+    
+vector_store_config:
+  # 数据库类型配置
+  database_type: "chunk_level"  # 可选: "case_level" 或 "chunk_level"
+  
+  # Case级别数据库配置
+  case_level:
+    persist_directory: ./chroma_db/rag_db/case_level
+    collection_name: case_level_collection
+    search_kwargs:
+      k: 5  # 检索top-3个case
+  
+  # Chunk级别数据库配置
+  chunk_level:
+    persist_directory: ./chroma_db/rag_db/chunk_level
+    collection_name: chunk_level_collection
+    search_kwargs:
+      k: 2  # 检索top-3个chunk
+
+log_config:
+  level: INFO
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  file: logs/rag.log 
