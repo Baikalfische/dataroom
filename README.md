@@ -37,7 +37,7 @@ Startup‑pragmatic two tiers: first “structure + coverage”, then “granula
 
 1. Lightweight (fast, no core refactor)
    - Hybrid: vector + simple inverted (BM25 / keyword scoring) to patch pure semantic misses.
-   - Clause header signal: parse “Section 3.2 / 第 X 条” into metadata to boost direct hits.
+   - Clause header signal: parse “Section 3.2 / Article X” into metadata to boost direct hits.
    - Query expansion: LLM synonyms / field sub‑queries (amount, date) → parallel retrieve + dedupe merge.
    - Candidate dedup: similarity cluster initial TopK to reduce near‑duplicate clauses.
    - Adaptive TopK: numeric / clause‑pattern queries increase structural weighting.
@@ -123,7 +123,7 @@ python main.py
 
 ## 💬 Usage
 1. Upload PDF or CSV (repeat to build corpus).
-2. Click “查看当前文件” to view ingested docs and stats.
+2. Click “List Current Files” to view ingested documents and statistics.
 3. Ask focused questions (include fields / assets / amounts).
 4. Citations appear at the end; if unsure the system states uncertainty.
 
