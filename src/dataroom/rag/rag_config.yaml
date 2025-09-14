@@ -1,38 +1,65 @@
-# RAG系统配置文件
+# RAG system configuration file
 base_dir: ./
 
 model_config:
-  # 嵌入模型配置
+  # Embedding model configuration
   embedding_model:
     name: openai/clip-vit-base-patch32
     provider: huggingface_transformers
     device: auto  # auto, cuda, cpu
     
+  # LLM model configuration
+  lm_model:
+    name: gemini-2.5-flash-lite
+    temperature: 0.2
+    max_length: 2048
+    top_p: 0.95
+  
+  # Prompt template configuration
+  prompt_template:
+    template: |
+      You are a professional real estate document analysis assistant. Answer the user's question based on the following document content.
+      
+      Document Content:
+      {context}
+      
+      User Question: {query}
+      
+      Please answer according to the following requirements:
+      1. Base your answer strictly on the provided document content and ensure accuracy.
+      2. Every answer must include specific citation sources.
+      3. Citation format: [filename p.X] for PDFs or [filename row Y] for CSV rows.
+      4. If multiple documents are involved, cite each separately.
+      5. If the answer cannot be found in the documents, clearly state that you cannot find it in the provided materials.
+      
+      Answer:
+    input_variables: ["context", "query"]
+    
 text_processing_config:
-  # 文本分块配置
+  # Text chunking configuration
   chunk_size: 1000
   chunk_overlap: 200
   
-  # PDF处理配置
+  # PDF processing configuration
   pdf_page_chunk: true
   max_pdf_pages: 50
   
-  # CSV处理配置
+  # CSV processing configuration
   csv_row_chunk: true
   csv_encoding: utf-8
 
 vector_store_config:
-  # 数据库配置
+  # Database configuration
   database_type: "dual"  # dual: PDF和CSV分别存储
   
-  # PDF数据库配置
+  # PDF database configuration
   pdf_database:
     persist_directory: ./chroma_db/pdf_db
     collection_name: pdf_documents
     search_kwargs:
       k: 5
   
-  # CSV数据库配置
+  # CSV database configuration
   csv_database:
     persist_directory: ./chroma_db/csv_db
     collection_name: csv_documents

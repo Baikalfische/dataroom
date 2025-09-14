@@ -1,0 +1,50 @@
+[
+  {
+    "metadata": {
+      "format": "PDF 1.3",
+      "title": "Example_Project_Assignment",
+      "author": "Manuel Derra",
+      "subject": "",
+      "keywords": "",
+      "creator": "Word",
+      "producer": "macOS Version 15.6.1 (Build 24G90) Quartz PDFContext",
+      "creationDate": "D:20250911144402Z00'00'",
+      "modDate": "D:20250911144402Z00'00'",
+      "trapped": "",
+      "encryption": null,
+      "file_path": "/Users/yipengzhang/dataroom/data/TASK_DESCRIPTION.pdf",
+      "page_count": 2,
+      "page": 1
+    },
+    "toc_items": [],
+    "tables": [],
+    "images": [],
+    "graphics": [],
+    "text": "# **Example Project – Chat-Enabled Dataroom for Real Estate Documents**\n\n## **Goal**\n\nBuild a prototype of a chat-enabled dataroom for real estate objects. Users should be able to\nupload documents (e.g. teaser exposé, rent roll, lease contracts) and then ask natural\nlanguage questions about them. Answers must be grounded in the uploaded documents and\ninclude explicit citations (document name, page, section).\n\nThis project is a candidate evaluation task. It is not about being feature-complete, but about\nhow you approach the problem, structure your solution, and reflect on critical design\n\ndecisions.\n\n## **Task**\n\n\n- Allow uploading of various documents (PDFs, CSVs, contracts).\n\n- Process and store the documents in a way that allows later retrieval.\n\n- Implement a mechanism to answer user questions based on the documents.\n\n- Ensure that answers always include sources/citations.\n\n- Provide documentation of your architecture and reasoning.\n\n## **Questions to Consider**\n\n\n- Approach: Is a classical RAG (retrieval-augmented generation) setup sufficient, or would\nan agent-based approach be better?\n\n- Scalability: What happens when the number of documents grows significantly, e.g. dozens\nof long contracts (>50 pages each)?\n\n- Data modeling: How should documents, sections, chunks, and metadata be structured for\n\nflexible search and reference?\n\n- Search & retrieval: How do you ensure relevant passages are found (e.g. hybrid search,\nembeddings, full-text search)?\n\n- Answer quality: How do you avoid hallucinations and guarantee that every answer is\nbacked by a citation?\n\n- Improvements: Which levers would you use to improve robustness and performance (e.g.\nchunking strategies, rerankers, index sharding, caching)?\n\n## **Critical Points (Most Important)**\n\n\n- Chunking & context window: How are texts segmented to reliably support question\nanswering?\n\n- Indexing & retrieval: How to efficiently search across large volumes of text?\n\n- Citations: Every answer must point back to concrete evidence in the source documents.\n\n- Contracts: Leases are long, repetitive, and full of legal language – how does your system\ndeal with this complexity?\n\n- Extensibility: How easily can the system be adapted to new document types, formats, or\n\nuse cases?\n\n\n",
+    "words": []
+  },
+  {
+    "metadata": {
+      "format": "PDF 1.3",
+      "title": "Example_Project_Assignment",
+      "author": "Manuel Derra",
+      "subject": "",
+      "keywords": "",
+      "creator": "Word",
+      "producer": "macOS Version 15.6.1 (Build 24G90) Quartz PDFContext",
+      "creationDate": "D:20250911144402Z00'00'",
+      "modDate": "D:20250911144402Z00'00'",
+      "trapped": "",
+      "encryption": null,
+      "file_path": "/Users/yipengzhang/dataroom/data/TASK_DESCRIPTION.pdf",
+      "page_count": 2,
+      "page": 2
+    },
+    "toc_items": [],
+    "tables": [],
+    "images": [],
+    "graphics": [],
+    "text": "## **Submission**\n\nPlease submit a GitHub repository containing:\n1. Your code with a short setup guide (README).\n2. A document or README section where you describe your architecture, design decisions,\nand reflections on the critical challenges.\n\n\n",
+    "words": []
+  }
+]

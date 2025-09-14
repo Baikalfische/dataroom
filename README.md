@@ -1,220 +1,177 @@
-# Chat-Enabled Dataroom for Real Estate Documents
+<div align="center">
 
-A prototype AI-powered dataroom that allows users to upload real estate documents and ask natural language questions about them. Built with LangChain Agent framework and Google Gemini for intelligent document analysis and Q&A.
+# 🏠 Real Estate Dataroom
 
-## 🚀 Features
+A minimal but working intelligent Q&A prototype for real estate / contract documents: upload PDF / CSV, invoke a single RAG retrieval tool, generate answers with citations via Google Gemini. Focus is on architecture & design trade‑offs, not piling on features.
 
-- **Document Upload**: Support for PDF, CSV, DOCX, and TXT files
-- **Intelligent Q&A**: Natural language questions with AI-powered answers
-- **Citation Tracking**: Every answer includes explicit citations (document name, page, section)
-- **Agent-Based Architecture**: Multi-step reasoning for complex queries
-- **Web Interface**: Clean Gradio-based UI for easy interaction
+</div>
 
-## 🏗️ Architecture
+## ✨ Current Functionality
+
+This version is a “minimum auditable” RAG skeleton for real estate / contract docs: multiple PDF / CSV uploads, automatic parse → chunk → embed → persist; a single retrieval tool is called by the Agent; answers include traceable citations. Goal: keep the full loop (Ingest → Retrieve → Assemble → Answer with Citations) stable & demo‑able, deferring heavy optimization.
+
+Implemented highlights (only what matters for future improvements):
+- Ingestion: multiple uploads; PDF by page, CSV by row (citations map directly to physical page/row).
+- Separate stores: PDF / CSV in distinct Chroma collections to avoid cross‑modality noise; enables later per‑type k / filters.
+- Embeddings: CLIP 512d (fast + cached) baseline before swapping to domain models or adding rerank.
+- Retrieval pipeline: independent TopK per store then merge; debug hooks allow recall inspection.
+- Agent loop: LangGraph single‑tool cycle; system prompt enforces “retrieve when unsure / no fabrication.”
+- Citations: `[filename p.X]` / `[filename row Y]`; duplicates allowed (later can merge).
+- File listing: button shows current documents & page/row counts.
+- Local run: single process, no external vector infra.
+
+> These foundations act as the “slab”; later precision tactics (Hybrid, rerank, finer splitting, structured index) can layer on without API breaks.
+
+## 🚧 Pain Points to Improve
+- Repetitive clause templates (e.g. rent escalation / liability) blur embeddings.
+- Long multi‑topic pages introduce noise when recalled wholesale.
+- Precise numeric / date alignment fragile (minor phrasing variance).
+- Cross‑document comparisons (e.g. highest escalation) need structured extraction & aggregation.
+- Clause traceability limited (page/row only; lacks clause numbering / headings).
+- Vague queries (“early termination?”) need rewrite / sub‑query expansion.
+- No labeled eval set yet → tuning lacks objective feedback.
+
+## 🛠️ Retrieval Accuracy Strategies
+
+Startup‑pragmatic two tiers: first “structure + coverage”, then “granularity + rerank”.
+
+1. Lightweight (fast, no core refactor)
+   - Hybrid: vector + simple inverted (BM25 / keyword scoring) to patch pure semantic misses.
+   - Clause header signal: parse “Section 3.2 / 第 X 条” into metadata to boost direct hits.
+   - Query expansion: LLM synonyms / field sub‑queries (amount, date) → parallel retrieve + dedupe merge.
+   - Candidate dedup: similarity cluster initial TopK to reduce near‑duplicate clauses.
+   - Adaptive TopK: numeric / clause‑pattern queries increase structural weighting.
+
+2. Mid Layer (adds small components)
+   - Secondary splitting: page → sentence / clause; row → field tokens; retrieve fine units then aggregate upward.
+   - Semantic rerank: cross‑encoder reorders ~30 first‑stage candidates.
+   - Structured field extraction: regex + light model for amounts / dates / percentages (aux key/value index).
+   - Multi‑stage retrieval: keyword / clause pre‑filter → vector expansion → rerank.
+   - Hard example logging: store “no answer / irrelevant” feedback for retraining / reweighting.
+
+## 🧱 Architecture Overview
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Gradio UI     │    │  LangChain      │    │   ChromaDB      │
-│                 │◄──►│     Agent       │◄──►│  Vector Store   │
-│  - File Upload  │    │                 │    │                 │
-│  - Chat Interface│   │  - Tools        │    │  - Embeddings   │
-└─────────────────┘    │  - Memory       │    │  - Metadata     │
-                       │  - Reasoning    │    └─────────────────┘
-                       └─────────────────┘
-                                │
-                       ┌─────────────────┐
-                       │  Google Gemini  │
-                       │     LLM         │
-                       │                 │
-                       └─────────────────┘
+╔════════════════════════════════════════════════════════════════╗
+║                             User / Browser                      ║
+╚════════════════════════════════════════════════════════════════╝
+      │ question / upload (PDF, CSV)
+      ▼
+┌───────────────────────────┐      Single turn flow (message→tool→message)
+│         Gradio UI         │──────────────────────────────────────┐
+│  - File upload (FS)       │                                      │
+│  - Chat history           │◀─ answer + citations ────────────────┘
+└───────────────┬──────────┘
+      │ invoke
+      ▼
+   ┌───────────────────┐   single tool bound + system prompt
+   │  Agent (LangGraph)│
+   │ - process node    │
+   │ - execute node    │
+   └─────────┬─────────┘
+        │ tool call: real_estate_document_search(query)
+        ▼
+   ┌──────────────────────────────┐
+   │           RAG Chain          │
+   │ 1. text→vector (CLIP)        │
+   │ 2. PDF vector search (k_pdf) │
+   │ 3. CSV vector search (k_csv) │
+   │ 4. merge / debug             │
+   │ 5. LLM answer + citations    │
+   └──────────┬─────────┬────────┘
+         │          │
+   ┌─────────▼───┐   ┌──▼─────────┐
+   │ PDF Collection│ │ CSV Collection│ (Chroma persisted)
+   └──────────────┘  └─────────────┘
 ```
 
-## 📁 Project Structure
+## 📂 Project Structure
 
 ```
-dataroom/
-├── src/
-│   ├── dataroom/
-│   │   ├── __init__.py
-│   │   ├── main.py                 # Main application entry point
-│   │   ├── config.py               # Configuration management
-│   │   ├── agent/
-│   │   │   ├── __init__.py
-│   │   │   ├── real_estate_agent.py # Main agent implementation
-│   │   │   ├── memory.py           # Agent memory management
-│   │   │   └── reasoning.py        # Reasoning logic
-│   │   ├── tools/
-│   │   │   ├── __init__.py
-│   │   │   ├── document_search.py  # Document search tool
-│   │   │   ├── calculation.py      # Calculation tool
-│   │   │   ├── citation.py         # Citation generation tool
-│   │   │   └── document_processor.py # Document processing tool
-│   │   ├── prompts/
-│   │   │   ├── __init__.py
-│   │   │   ├── system_prompts.py   # System prompts for agent
-│   │   │   ├── tool_prompts.py     # Tool-specific prompts
-│   │   │   └── citation_prompts.py # Citation generation prompts
-│   │   ├── ui/
-│   │   │   ├── __init__.py
-│   │   │   ├── gradio_app.py       # Gradio interface
-│   │   │   └── components.py       # UI components
-│   │   └── utils/
-│   │       ├── __init__.py
-│   │       ├── file_utils.py       # File handling utilities
-│   │       ├── logging.py          # Logging configuration
-│   │       └── validators.py       # Input validation
-├── data/
-│   ├── uploads/                    # Uploaded documents
-│   ├── processed/                  # Processed documents
-│   └── chroma_db/                  # ChromaDB storage
-├── tests/
-│   ├── __init__.py
-│   ├── test_agent.py
-│   ├── test_tools.py
-│   └── test_ui.py
-├── prompts/
-│   ├── system_prompt.txt
-│   ├── tool_descriptions.txt
-│   └── citation_template.txt
+.
+├── main.py                     # entrypoint: init agent + launch UI
 ├── docs/
-│   ├── architecture.md
-│   ├── api_reference.md
-│   └── deployment.md
-├── .gitignore
-├── .env.example
-├── pyproject.toml
-├── requirements.txt
-└── README.md
+│   └── system_prompt.txt       # system prompt
+├── src/dataroom/agent/agent.py # agent (LangGraph state machine + tool exec)
+├── src/dataroom/rag/
+│   ├── build_database.py       # vector store mgmt
+│   ├── rag_chain.py            # retrieval + context assembly
+│   ├── embedder.py             # CLIP embeddings
+│   ├── chunks.py               # CSV row-level chunking
+│   ├── document_manager.py     # (upload wrapper, can be trimmed)
+│   └── rag_config.yaml         # model / retrieval config
+├── src/dataroom/tools/rag_tool.py  # RAG tool
+├── src/dataroom/tools/parser.py    # PDF/CSV parsing
+├── src/dataroom/ui/interface.py    # minimal Gradio UI
+├── src/dataroom/utils/utils.py     # helpers
+├── chroma_db/ pdf_db/ csv_db/      # persistent vector DBs
+├── data/                           # sample docs
+└── tests/ test_parser.py           # basic test
 ```
 
-## 🛠️ Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd dataroom
-   ```
-
-2. **Create virtual environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Set up environment variables**
-   ```bash
-   cp env.example .env
-   # Edit .env with your Google API key
-   ```
-
-5. **Run the application**
-   ```bash
-   python src/dataroom/main.py
-   ```
-
-## 🔧 Configuration
-
-Key configuration options in `.env`:
-
-- `GOOGLE_API_KEY`: Your Google Gemini API key
-- `CHROMA_PERSIST_DIRECTORY`: Path for ChromaDB storage
-- `MAX_FILE_SIZE_MB`: Maximum file size for uploads
-- `CHUNK_SIZE`: Document chunking size for processing
-
-## 🎯 Usage
-
-1. **Upload Documents**: Use the web interface to upload PDF, CSV, or other supported documents
-2. **Ask Questions**: Type natural language questions about your documents
-3. **Get Answers**: Receive AI-powered answers with explicit citations
-
-### Example Questions:
-- "What is the total rental income from all leases?"
-- "Which tenant has the highest rent per square foot?"
-- "What are the key terms in the lease agreement for tenant ABC?"
-- "Calculate the average lease duration across all contracts"
-
-## 🧪 Testing
+## ⚙️ Quick Start
 
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=src/dataroom
-
-# Run specific test file
-pytest tests/test_agent.py
+git clone <your-repo-url>
+cd dataroom
+python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -e .
+export GOOGLE_API_KEY=YOUR_KEY   # Windows: set GOOGLE_API_KEY=...
+python main.py
+# visit http://127.0.0.1:7860
 ```
 
-## 📝 Development
+## 💬 Usage
+1. Upload PDF or CSV (repeat to build corpus).
+2. Click “查看当前文件” to view ingested docs and stats.
+3. Ask focused questions (include fields / assets / amounts).
+4. Citations appear at the end; if unsure the system states uncertainty.
 
-### Code Quality
-```bash
-# Format code
-black src/ tests/
-
-# Sort imports
-isort src/ tests/
-
-# Lint code
-flake8 src/ tests/
-
-# Type checking
-mypy src/
+### Example Queries
+```
+“Does the contract contain a rent escalation clause?”
+“Which assets in the CSV have the highest NOI?”
+“What lease term (start/end) is mentioned on page 10 of the first PDF?”
 ```
 
-### Pre-commit Hooks
-```bash
-pip install pre-commit
-pre-commit install
-```
+## 🧠 Key Design Decisions & Rationale
 
-## 🚀 Deployment
+| Decision | Chosen | Main (Real) Motivation | Alternatives | Why Not Chosen | Future Direction |
+|----------|--------|------------------------|--------------|----------------|------------------|
+| Tool count | Single tool `real_estate_document_search` | Validate retrieval+citation loop only | Multiple tools (search/calc/format) | More orchestration complexity | Add structured calc / batch analysis tools later |
+| Retrieval paradigm | Pure vector TopK (CLIP) | Lowest effort to prove viability | Hybrid (Vector+BM25) / keyword filter | Extra index & tuning | Introduce BM25 or custom inverted → score fusion |
+| Store split | Separate PDF / CSV collections | Avoid noise; clearer stats | Single collection + type field | Filtering still splits; stats less direct | Add unified aggregation view |
+| Chunk granularity | PDF=page / CSV=row | Stable citations; quick | Sentence / sliding / semantic | Higher cleanup & complexity | Add secondary sentence split for long pages |
+| Embedding model | CLIP 512d | Existing dep; good for MVP | bge / jina / text-embedding-004 | Time to evaluate & swap | Replace with domain text model + rerank |
+| Context assembly | Simple concat + separators | Fast prototype; readable | Structured tables / clustering | Higher time cost | Field grouped summaries (rent/area) |
+| Citation format | `[file p.X]` / `[file row Y]` | Short & clear | Inline JSON / hyperlinks | Verbose or UI work | Merge duplicate refs + anchors |
+| Agent framework | LangGraph loop | Explicit states (respond vs tool) | Direct single-shot LLM | Harder to extend | Add rerank / filter nodes |
+| UI | Single page upload + chat | Reduce UI surface; focus validation | Multi-tab / session mgmt | Out of scope | Add session save & citation replay |
 
-The application can be deployed using:
-- Docker
-- Cloud platforms (Google Cloud, AWS, Azure)
-- Local server deployment
+> Reason for deferring Hybrid / rerank / secondary splitting now: 
+> (1) Need more real doc diversity (contracts, statutes, rent schedules, ops reports) to profile template variance; 
+> (2) Need a minimal evaluation set (20~50 labeled Q/A) to avoid blind tuning; 
+> (3) Multiple strategies together require abstraction of a retrieval strategy layer & fusion weighting, adding short‑term complexity. **Hence: lock a working end‑to‑end baseline first, then iterate.**
 
-See `docs/deployment.md` for detailed deployment instructions.
+## 🧗 Key Challenges & Reflections
 
-## 📊 Performance Considerations
+| Challenge | Current Handling | Pain / Impact | Next Idea | Priority |
+|-----------|-----------------|---------------|-----------|----------|
+| Low accuracy (synonyms / long pages) | Basic vector TopK; page granularity | Missed recall / noise pages | Hybrid + sentence split + local rerank | High |
+| Repetition & templated clauses | None yet | Subtle differences lost | Clause number regex + weighted fields | High |
+| Single tool extensibility | All needs in one RAG | Prompt inflation later | Split tools (retrieval / calc / summary) | Medium |
+| Coarse granularity | Quick build | Hard fine location; citation coarse | Secondary split (page→sentence; row→fields) | Medium |
+| No rerank | None | Unstable TopK order | Add cross-encoder / miniLM reranker | Medium |
+| Embedding generality | CLIP used | Domain nuance weak | Evaluate domain embeddings + cache migration | Medium |
+| File listing scalability | Full scan get() | O(N) latency at scale | Maintain document_manifest index | Low |
 
-- **Document Processing**: Optimized chunking strategies for large documents
-- **Vector Search**: Efficient similarity search with ChromaDB
-- **Memory Management**: Agent memory optimization for long conversations
-- **Caching**: Response caching for frequently asked questions
+> Current main bottleneck: lack of hybrid retrieval + finer-grain context leads to weaker performance on “semantic + precise field” questions. **Value delivered: traceable citations & basic cross-document Q&A loop.**
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
 
 ## 📄 License
+MIT License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## 📬 Submission Alignment
+1. Included: code + setup guide (see Quick Start).
+2. Architecture, design decisions & challenges: see respective sections.
 
-## 🔮 Future Enhancements
-
-- [ ] Multi-modal document support (images, tables)
-- [ ] Advanced analytics and reporting
-- [ ] Multi-language support
-- [ ] API endpoints for integration
-- [ ] Advanced security and access control
-- [ ] Real-time collaboration features
-
-## 📞 Support
-
-For questions and support, please open an issue on GitHub or contact the development team.
-
----
-
-**Note**: This is a prototype project for evaluation purposes. Focus is on demonstrating approach, solution structure, and critical design decisions rather than feature completeness.

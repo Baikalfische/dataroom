@@ -4,34 +4,35 @@ Uses CLIP text encoder for text embeddings only.
 """
 
 import os
+import yaml
 import torch
 from transformers import CLIPProcessor, CLIPModel
 from typing import List, Union, Optional
 from dotenv import load_dotenv
-
-from .config import config
+from pathlib import Path
 
 # Load environment variables
 load_dotenv()
 
 class DocumentEmbedder:
-    """
-    文本文档嵌入器，使用CLIP模型的文本编码器
-    """
+    """Text document embedder using the CLIP text encoder."""
     
     def __init__(self, model_name: Optional[str] = None, device: Optional[str] = None):
-        """
-        初始化CLIP文本嵌入器
-        
+        """Initialize CLIP text embedder.
+
         Args:
-            model_name: CLIP模型名称，None则使用配置文件中的设置
-            device: 运行设备，None则使用配置文件中的设置
+            model_name: CLIP model name; if None use config file
+            device: execution device; if None resolve from config
         """
-        # 从配置文件获取设置
-        embed_config = config.get_embedding_config()
+    # Load settings from YAML config
+        config_path = Path(__file__).parent / "rag_config.yaml"
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        
+        embed_config = config["model_config"]["embedding_model"]
         self.model_name = model_name or embed_config.get("name", "openai/clip-vit-base-patch32")
         
-        # 设备设置
+    # Device selection
         if device:
             self.device = device
         elif embed_config.get("device") == "auto":
@@ -41,16 +42,16 @@ class DocumentEmbedder:
         
         print(f"🚀 Initializing CLIP Text Embedder on device: {self.device}")
         
-        # 设置模型缓存目录
+    # Model cache directory setup
         cache_dir = './model-weights/huggingface'
         clip_model_path = os.path.join(cache_dir, 'clip')
         clip_processor_path = os.path.join(cache_dir, 'clip_processor')
         
-        # 创建缓存目录
+    # Ensure cache directories exist
         os.makedirs(clip_model_path, exist_ok=True)
         os.makedirs(clip_processor_path, exist_ok=True)
         
-        # 加载CLIP模型和处理器
+    # Load CLIP model & processor
         self.model = CLIPModel.from_pretrained(
             self.model_name, 
             cache_dir=clip_model_path
@@ -64,16 +65,15 @@ class DocumentEmbedder:
         print(f"✅ CLIP model loaded successfully from {self.model_name}")
     
     def embed(self, texts: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
-        """
-        嵌入方法，处理单个文本或多个文本
-        
+        """Embed one or many texts.
+
         Args:
-            texts: 单个文本字符串或文本列表
-            
+            texts: single string or list of strings
+
         Returns:
-            单个文本返回嵌入向量，多个文本返回嵌入向量列表
+            Single embedding vector or list of vectors
         """
-        # 统一处理：单个文本转为列表
+    # Normalize single input to list
         if isinstance(texts, str):
             texts = [texts]
             return_single = True
@@ -93,13 +93,13 @@ class DocumentEmbedder:
                 ).to(self.device)
                 
                 text_emb = self.model.get_text_features(**text_inputs)
-                # 归一化
+                # Normalize
                 text_emb = text_emb / text_emb.norm(p=2, dim=-1, keepdim=True)
                 
-                # 转换为列表格式
+                # Convert to list
                 embeddings = text_emb.cpu().numpy().tolist()
                 
-                # 如果输入是单个文本，返回单个向量
+                # Return single vector if original input was single
                 if return_single:
                     return embeddings[0]
                 else:

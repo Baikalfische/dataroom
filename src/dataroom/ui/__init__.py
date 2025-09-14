@@ -1,6 +1,5 @@
 """UI module for Gradio interface."""
 
-from .gradio_app import create_app
-from .components import FileUploadComponent, ChatComponent
+from .interface import create_demo, RealEstateInterface
 
-__all__ = ["create_app", "FileUploadComponent", "ChatComponent"]
+__all__ = ["create_demo", "RealEstateInterface"]
